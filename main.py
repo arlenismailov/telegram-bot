@@ -1,71 +1,80 @@
-import os
 import telebot
-from telebot import types
-
-# Создание объекта бота с токеном для Telegram
-bot = telebot.TeleBot('7883182364:AAFZFk8yTdGw-p2IPzSFhBymiVrDQqXCjY4')
-
-# Убедимся, что рабочая директория соответствует местоположению проекта
-os.chdir(r'C:\Users\Arlen\django_lesson\telegram-bot\pythonProject')
+import sqlite3
+# @fafadafadaaf_bot
+# Создаем экземпляр бота с токеном
+bot = telebot.TeleBot('7351254259:AAHcfBPP1XVpefets4sHDBJmo1ActRrvMmE')
+name = None  # Переменная для хранения имени пользователя
 
 
-# Обработчик команды '/start'
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start'])  # Обработчик команды /start
 def start(message):
-    # Создание клавиатуры с кнопками
-    markup = types.ReplyKeyboardMarkup()
-    btn1 = types.KeyboardButton('Пeрeйти на сайт 😁')  # Кнопка для перехода на сайт
-    markup.row(btn1)
-    btn2 = types.KeyboardButton('Удалить фото')  # Кнопка для удаления фото
-    btn3 = types.KeyboardButton('Изменить текст')  # Кнопка для изменения текста
-    markup.row(btn2, btn3)
+    # Подключаемся к базе данных или создаем файл базы данных, если его нет
+    conn = sqlite3.connect('itproger.sql')
+    cur = conn.cursor()
 
-    # Открытие файла с изображением
-    file = open('./img.png', 'rb')
-    # Отправка изображения пользователю
-    bot.send_photo(message.chat.id, file, reply_markup=markup)
+    # Создаем таблицу пользователей, если она не существует
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            name TEXT, 
+            pass TEXT
+        )
+    ''')
+    conn.commit()  # Сохраняем изменения в базе
+    cur.close()  # Закрываем курсор
+    conn.close()  # Закрываем подключение к базе
 
-    # Отправка текстового сообщения с клавиатурой
-    bot.send_message(message.chat.id, 'hi', reply_markup=markup)
-    # Регистрация следующего действия пользователя
-    bot.register_next_step_handler(message, on_click)
-
-
-# Функция для обработки следующего действия пользователя
-def on_click(message):
-    if message.text.lower() == 'пeрeйти на сайт':
-        bot.send_message(message.chat.id, 'Website is open')  # Сообщение при переходе на сайт
-    elif message.text == 'Удалить фото':
-        bot.send_message(message.chat.id, 'Delete')  # Сообщение при удалении фото
+    # Отправляем сообщение и запрашиваем имя пользователя
+    bot.send_message(message.chat.id, 'Привет, сейчас тебя зарегистрируем! Введите имя!')
+    bot.register_next_step_handler(message, user_name)  # Переход к следующему шагу
 
 
-# Обработчик сообщений с фото или видео
-@bot.message_handler(content_types=['photo', 'video'])
-def get_photo(message):
-    # Создание встроенной клавиатуры
-    markup = types.InlineKeyboardMarkup()
-    # Кнопка для перехода на сайт
-    btn1 = types.InlineKeyboardButton('Пуруйти на сайт', url='https://www.youtube.com/watch?v=RpiWnPNTeww&t=42s')
-    markup.row(btn1)
-    # Кнопка для удаления фото
-    btn2 = types.InlineKeyboardButton('Удалить фото', callback_data='delete')
-    # Кнопка для изменения текста
-    btn3 = types.InlineKeyboardButton('Изменить текст', callback_data='edit')
-    markup.row(btn2, btn3)
-    # Ответ на сообщение с фото/видео
-    bot.reply_to(message, 'Какое красивое фото', reply_markup=markup)
+def user_name(message):
+    global name
+    name = message.text.strip()  # Сохраняем введенное имя без лишних пробелов
+    bot.send_message(message.chat.id, 'Введите пароль')  # Запрашиваем пароль
+    bot.register_next_step_handler(message, user_pass)  # Переход к следующему шагу
 
 
-# Обработчик нажатий на кнопки встроенной клавиатуры
-@bot.callback_query_handler(func=lambda callback: True)
-def callback_message(callback):
-    if callback.data == 'delete':
-        # Удаление предыдущего сообщения
-        bot.delete_message(callback.message.chat.id, callback.message.message_id - 1)
-    elif callback.data == 'edit':
-        # Изменение текста сообщения
-        bot.edit_message_text('Edit text', callback.message.chat.id, callback.message.message_id)
+def user_pass(message):
+    password = message.text.strip()  # Сохраняем введенный пароль без лишних пробелов
+
+    # Подключаемся к базе данных
+    conn = sqlite3.connect('itproger.sql')
+    cur = conn.cursor()
+
+    # Добавляем запись с именем и паролем в таблицу users
+    cur.execute(f'INSERT INTO users (name, pass) VALUES ("%s", "%s")' % (name, password))
+    conn.commit()  # Сохраняем изменения
+    cur.close()  # Закрываем курсор
+    conn.close()  # Закрываем подключение к базе
+
+    # Создаем кнопку для отображения списка пользователей
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(telebot.types.InlineKeyboardButton('Список пользователей', callback_data='users'))
+    bot.send_message(message.chat.id, 'Пользователь зарегистрирован!', reply_markup=markup)  # Сообщаем о регистрации
 
 
-# Запуск бота с непрерывным опросом сервера Telegram
+@bot.callback_query_handler(func=lambda call: True)  # Обработчик для нажатий на кнопки
+def callback(call):
+    # Подключаемся к базе данных
+    conn = sqlite3.connect('itproger.sql')
+    cur = conn.cursor()
+
+    # Извлекаем всех пользователей из таблицы
+    cur.execute('SELECT * FROM users')
+    users = cur.fetchall()  # Получаем все строки результата
+
+    # Формируем строку с информацией о пользователях
+    info = ''
+    for el in users:
+        info += f'Имя: {el[1]}, пароль: {el[2]}\n'  # Добавляем имя и пароль каждого пользователя
+    cur.close()  # Закрываем курсор
+    conn.close()  # Закрываем подключение к базе
+
+    # Отправляем пользователю информацию о всех зарегистрированных
+    bot.send_message(call.message.chat.id, info)
+
+
+# Запускаем бота в режиме непрерывного получения сообщений
 bot.polling(none_stop=True)
