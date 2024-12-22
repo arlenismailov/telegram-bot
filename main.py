@@ -1,44 +1,54 @@
+import os
 import telebot
-import webbrowser
+from telebot import types
 
-# Создаем объект бота
-bot = telebot.TeleBot('7357624493:AAFAOIvr1JjT0E6jsmUeCLr0bLqQlPjOmds')
+bot = telebot.TeleBot('7883182364:AAFZFk8yTdGw-p2IPzSFhBymiVrDQqXCjY4')
 
-
-# Обработчик команды /site или /website
-# Когда пользователь вводит команду /site или /website, открывается указанная ссылка в веб-браузере
-@bot.message_handler(commands=['site', 'website'])
-def site(message):
-    webbrowser.open('https://www.youtube.com/watch?v=-l_CYgBj4IE&list=PL0lO_mIqDDFUev1gp9yEwmwcy8SicqKbt&index=2')
+# Убедимся, что рабочая директория правильная
+os.chdir(r'C:\Users\Arlen\django_lesson\telegram-bot\pythonProject')
 
 
-# Обработчик команд /start, /main или /hello
-# Бот отправляет приветственное сообщение с именем и фамилией пользователя
-@bot.message_handler(commands=['start', 'main', 'hello'])
-def main(message):
-    bot.send_message(message.chat.id, f'Hi, {message.from_user.first_name} {message.from_user.last_name}')
+@bot.message_handler(commands=['start'])
+def start(message):
+    markup = types.ReplyKeyboardMarkup()
+    btn1 = types.KeyboardButton('Пeрeйти на сайт 😁')
+    markup.row(btn1)
+    btn2 = types.KeyboardButton('Удалить фото')
+    btn3 = types.KeyboardButton('Изменить текст')
+    markup.row(btn2, btn3)
+    file = open('./img.png', 'rb')
+    bot.send_photo(message.chat.id, file, reply_markup=markup)
+    # bot.send_video(message.chat.id, file, reply_markup=markup)
+    # bot.send_audio(message.chat.id, file, reply_markup=markup)
+
+    bot.send_message(message.chat.id, 'hi', reply_markup=markup)
+    bot.register_next_step_handler(message, on_click)
 
 
-# Обработчик команды /help
-# Отправляет сообщение с HTML-форматированием, чтобы показать пример помощи
-@bot.message_handler(commands=['help'])
-def main(message):
-    bot.send_message(message.chat.id, '<b>help</b> <em><u>informetion</u></em>', parse_mode='html')
+def on_click(message):
+    if message.text.lower() == 'Пeрeйти на сайт':
+        bot.send_message(message.chat.id, 'Website is open')
+    elif message.text == 'Удалить фото':
+        bot.send_message(message.chat.id, 'Delete')
 
 
-# Обработчик всех остальных сообщений
-# Реагирует на определенные тексты: "привет" и "id"
-@bot.message_handler()
-def info(message):
-    if message.text.lower() == 'привет':
-        # Если пользователь пишет "привет", бот отвечает с именем и фамилией
-        bot.send_message(message.chat.id, f'привет, {message.from_user.first_name} {message.from_user.last_name}')
-    elif message.text.lower() == 'id':
-        # Если пользователь пишет "id", бот отправляет его имя
-        bot.reply_to(message, f'ID: {message.from_user.first_name}')
-    # Подготовлено для добавления других условий
-    # elif message.test.lower() == ''
+@bot.message_handler(content_types=['photo', 'video'])
+def get_photo(message):
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('Пуруйти на сайт', url='https://www.youtube.com/watch?v=RpiWnPNTeww&t=42s')
+    markup.row(btn1)
+    btn2 = types.InlineKeyboardButton('Удалить фото', callback_data='delete')
+    btn3 = types.InlineKeyboardButton('Изменить текст', callback_data='edit')
+    markup.row(btn2, btn3)
+    bot.reply_to(message, 'Какое красивое фото', reply_markup=markup)
 
 
-# Запуск бота, чтобы он обрабатывал сообщения беспрерывно
+@bot.callback_query_handler(func=lambda callback: True)
+def callback_message(callback):
+    if callback.data == 'delete':
+        bot.delete_message(callback.message.chat.id, callback.message.message_id - 1)
+    elif callback.data == 'edit':
+        bot.edit_message_text('Edit text', callback.message.chat.id, callback.message.message_id)
+
+
 bot.polling(none_stop=True)
