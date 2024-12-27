@@ -1,42 +1,61 @@
 import telebot
-import requests
-import json
+from currency_converter import CurrencyConverter
+from telebot import types
 
-bot = telebot.TeleBot('7675326861:AAGE-XW46hhotz0KqFBdVVBtcyotdMMUqyg')
-API = 'da9abad7c2f64d0d90657e1d60ca6199'
+bot = telebot.TeleBot('7651063544:AAF2gCfraQfZi4n5ISc1hk-Aiwpe3428Pk0')
+currency = CurrencyConverter()
+amount = 0
 
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, 'Привет, рад тебя видеть! Hапиши название города')
+    bot.send_message(message.chat.id, 'Привет, введите сумму')
+    bot.register_next_step_handler(message, summa)
 
 
-import os
+def summa(message):
+    global amount
+    try:
+        amount = int(message.text.strip())
+    except ValueError:
+        bot.send_message(message.chat.id, 'Неверный формат. Впишите сумму')
+        bot.register_next_step_handler(message, summa)
+        return
 
-
-@bot.message_handler(content_types=['text'])
-def get_weather(message):
-    city = message.text.strip().lower()
-    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API}&units=metric')
-    if res.status_code == 200:
-        data = json.loads(res.text)
-        temp = data["main"]["temp"]
-
-        bot.reply_to(message, f'Сейчас погода: {temp}')
-
-        # Абсолютный путь к изображению
-        image = 'sun.png' if temp > 5.0 else 'cold.png'
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(BASE_DIR, image)
-
-        try:
-            with open(file_path, 'rb') as file:
-                bot.send_photo(message.chat.id, file)
-        except FileNotFoundError:
-            bot.reply_to(message, "Не удалось найти изображение.")
-
+    if amount > 0:
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton('USD/EUR', callback_data='usd/eur')
+        btn2 = types.InlineKeyboardButton('EUR/USD', callback_data='eur/usd')
+        btn3 = types.InlineKeyboardButton('USD/GBP', callback_data='usd/gbp')
+        btn4 = types.InlineKeyboardButton('Другое значение', callback_data='else')
+        markup.add(btn1, btn2, btn3, btn4)
+        bot.send_message(message.chat.id, 'Выберите пару валют', reply_markup=markup)
     else:
-        bot.reply_to(message, f'Город указан неверно')
+        bot.send_message(message.chat.id, 'Число должно быть больше 0, введите сумму')
+        bot.register_next_step_handler(message, summa)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback(call):
+    if call.data != 'else':
+        values = call.data.upper().split('/')
+        res = currency.convert(amount, values[0], values[1])
+        bot.send_message(call.message.chat.id, f'Получается: {round(res, 2)}. Можете заново вписать сумму')
+        bot.register_next_step_handler(call.message, summa)
+    else:
+        bot.send_message(call.message.chat.id, 'Введите пару значений через слеш')
+        bot.register_next_step_handler(call.message, my_currency)
+
+
+def my_currency(message):
+    try:
+        values = message.text.upper().split('/')
+        res = currency.convert(amount, values[0], values[1])
+        bot.send_message(message.chat.id, f'Получается: {round(res, 2)}. Можете заново вписать сумму')
+        bot.register_next_step_handler(message, summa)
+    except Exception:
+        bot.send_message(message.chat.id, 'Что-то не так. Впишите значение заново')
+        bot.register_next_step_handler(message, my_currency)
 
 
 bot.polling(none_stop=True)
