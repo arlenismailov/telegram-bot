@@ -1,7 +1,7 @@
 import telebot
 from currency_converter import CurrencyConverter
 from telebot import types
-
+# @ffafde_bot
 bot = telebot.TeleBot('7651063544:AAF2gCfraQfZi4n5ISc1hk-Aiwpe3428Pk0')
 currency = CurrencyConverter()
 amount = 0
