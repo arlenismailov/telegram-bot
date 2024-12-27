@@ -1,80 +1,42 @@
 import telebot
-import sqlite3
-# @fafadafadaaf_bot
-# Создаем экземпляр бота с токеном
-bot = telebot.TeleBot('7351254259:AAHcfBPP1XVpefets4sHDBJmo1ActRrvMmE')
-name = None  # Переменная для хранения имени пользователя
+import requests
+import json
+
+bot = telebot.TeleBot('7675326861:AAGE-XW46hhotz0KqFBdVVBtcyotdMMUqyg')
+API = 'da9abad7c2f64d0d90657e1d60ca6199'
 
 
-@bot.message_handler(commands=['start'])  # Обработчик команды /start
+@bot.message_handler(commands=['start'])
 def start(message):
-    # Подключаемся к базе данных или создаем файл базы данных, если его нет
-    conn = sqlite3.connect('itproger.sql')
-    cur = conn.cursor()
-
-    # Создаем таблицу пользователей, если она не существует
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            name TEXT, 
-            pass TEXT
-        )
-    ''')
-    conn.commit()  # Сохраняем изменения в базе
-    cur.close()  # Закрываем курсор
-    conn.close()  # Закрываем подключение к базе
-
-    # Отправляем сообщение и запрашиваем имя пользователя
-    bot.send_message(message.chat.id, 'Привет, сейчас тебя зарегистрируем! Введите имя!')
-    bot.register_next_step_handler(message, user_name)  # Переход к следующему шагу
+    bot.send_message(message.chat.id, 'Привет, рад тебя видеть! Hапиши название города')
 
 
-def user_name(message):
-    global name
-    name = message.text.strip()  # Сохраняем введенное имя без лишних пробелов
-    bot.send_message(message.chat.id, 'Введите пароль')  # Запрашиваем пароль
-    bot.register_next_step_handler(message, user_pass)  # Переход к следующему шагу
+import os
 
 
-def user_pass(message):
-    password = message.text.strip()  # Сохраняем введенный пароль без лишних пробелов
+@bot.message_handler(content_types=['text'])
+def get_weather(message):
+    city = message.text.strip().lower()
+    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API}&units=metric')
+    if res.status_code == 200:
+        data = json.loads(res.text)
+        temp = data["main"]["temp"]
 
-    # Подключаемся к базе данных
-    conn = sqlite3.connect('itproger.sql')
-    cur = conn.cursor()
+        bot.reply_to(message, f'Сейчас погода: {temp}')
 
-    # Добавляем запись с именем и паролем в таблицу users
-    cur.execute(f'INSERT INTO users (name, pass) VALUES ("%s", "%s")' % (name, password))
-    conn.commit()  # Сохраняем изменения
-    cur.close()  # Закрываем курсор
-    conn.close()  # Закрываем подключение к базе
+        # Абсолютный путь к изображению
+        image = 'sun.png' if temp > 5.0 else 'cold.png'
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(BASE_DIR, image)
 
-    # Создаем кнопку для отображения списка пользователей
-    markup = telebot.types.InlineKeyboardMarkup()
-    markup.add(telebot.types.InlineKeyboardButton('Список пользователей', callback_data='users'))
-    bot.send_message(message.chat.id, 'Пользователь зарегистрирован!', reply_markup=markup)  # Сообщаем о регистрации
+        try:
+            with open(file_path, 'rb') as file:
+                bot.send_photo(message.chat.id, file)
+        except FileNotFoundError:
+            bot.reply_to(message, "Не удалось найти изображение.")
 
-
-@bot.callback_query_handler(func=lambda call: True)  # Обработчик для нажатий на кнопки
-def callback(call):
-    # Подключаемся к базе данных
-    conn = sqlite3.connect('itproger.sql')
-    cur = conn.cursor()
-
-    # Извлекаем всех пользователей из таблицы
-    cur.execute('SELECT * FROM users')
-    users = cur.fetchall()  # Получаем все строки результата
-
-    # Формируем строку с информацией о пользователях
-    info = ''
-    for el in users:
-        info += f'Имя: {el[1]}, пароль: {el[2]}\n'  # Добавляем имя и пароль каждого пользователя
-    cur.close()  # Закрываем курсор
-    conn.close()  # Закрываем подключение к базе
-
-    # Отправляем пользователю информацию о всех зарегистрированных
-    bot.send_message(call.message.chat.id, info)
+    else:
+        bot.reply_to(message, f'Город указан неверно')
 
 
-# Запускаем бота в режиме непрерывного получения сообщений
 bot.polling(none_stop=True)
